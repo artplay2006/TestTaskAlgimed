@@ -22,25 +22,13 @@ namespace TestTaskAlgimed
     /// </summary>
     public partial class Registration : Window
     {
+        private ValidateUserViewModel _viewModel = new ValidateUserViewModel();
         public Registration()
         {
             InitializeComponent();
+            DataContext = _viewModel;
         }
 
-        private static bool ValidationPassword(string password)
-        {
-            if (password.Length <= 6)
-            {
-                MessageBox.Show("Пароль должен содержать не менее 6-ти символов");
-                return false;
-            }
-            else if(!Regex.IsMatch(password, @"^(?=.*\p{L})(?=.*\p{N})"))
-            {
-                MessageBox.Show("Пароль должен содержать хотя бы одну букву или цифру");
-                return false;
-            }
-            return true;
-        }
 
         private void Button_Click(object sender, RoutedEventArgs e)
         {
@@ -50,44 +38,19 @@ namespace TestTaskAlgimed
 
         private async void RegButton_Click(object sender, RoutedEventArgs e)
         {
-            if (string.IsNullOrEmpty(LoginLabel.Text))
-            {
-                MessageBox.Show("Логин не написан");
-            }
-            else if (string.IsNullOrEmpty(PasswordLabel.Text))
-            {
-                MessageBox.Show("Пароль не написан");
-            }
-            else if (!ValidationPassword(PasswordLabel.Text))
+            if (!await _viewModel.ValidateFieldsReg())
             {
                 return;
             }
-            else if (string.IsNullOrEmpty(RepeatPasswordLabel.Text))
+            await using (var db = new DatabaseContext())
             {
-                MessageBox.Show("Повтор пароля не написан");
+                await db.Users.AddAsync(new User { Login = LoginLabel.Text, Password = PasswordLabel.Text });
+                await db.SaveChangesAsync();
+                MessageBox.Show("Аккаунт создан");
+                new Authorization().Show();
+                Close();
             }
-            else if (RepeatPasswordLabel.Text != PasswordLabel.Text)
-            {
-                MessageBox.Show("Повтор пароля не совпадает с паролем");
-            }
-            else
-            {
-                await using (var db = new DatabaseContext())
-                {
-                    if (await db.Users.FirstOrDefaultAsync(u=>u.Login==LoginLabel.Text)!=null)
-                    {
-                        MessageBox.Show("Такой логин уже существует");
-                    }
-                    else
-                    {
-                        await db.Users.AddAsync(new User { Login = LoginLabel.Text, Password = PasswordLabel.Text});
-                        MessageBox.Show("Аккаунт создан");
-                        await db.SaveChangesAsync();
-                        new Authorization().Show();
-                        Close();
-                    }
-                }
-            }
+
         }
     }
 }

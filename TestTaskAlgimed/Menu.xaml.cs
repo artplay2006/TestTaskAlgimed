@@ -27,11 +27,13 @@ namespace TestTaskAlgimed
         private void ModesTableButton_Click(object sender, RoutedEventArgs e)
         {
             new Modes().Show();
+            Close();
         }
 
         private void StepsTableButton_Click(object sender, RoutedEventArgs e)
         {
             new Steps().Show();
+            Close();
         }
     }
 }

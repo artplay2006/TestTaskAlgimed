@@ -21,40 +21,28 @@ namespace TestTaskAlgimed
     /// </summary>
     public partial class Authorization : Window
     {
+        private ValidateUserViewModel _viewModel = new ValidateUserViewModel();
         public Authorization()
         {
             InitializeComponent();
+            DataContext = _viewModel;
         }
 
         private async void AuthButton_Click(object sender, RoutedEventArgs e)
         {
-            if (string.IsNullOrEmpty(LoginLabel.Text))
+            if (!await _viewModel.ValidateFieldsAuth())
             {
-                MessageBox.Show("Логин не написан");
+                return;
             }
-            else if (string.IsNullOrEmpty(PasswordLabel.Text))
+
+            try
             {
-                MessageBox.Show("Пароль не написан");
+                new Menu().Show();
+                Close();
             }
-            else
+            catch (Exception ex)
             {
-                await using (var db = new DatabaseContext())
-                {
-                    var user = await db.Users.FirstOrDefaultAsync(u=>u.Login==LoginLabel.Text);
-                    if(user == null)
-                    {
-                        MessageBox.Show($"Пользователя с логином {LoginLabel.Text} не существует");
-                    }
-                    else if (PasswordLabel.Text != user.Password)
-                    {
-                        MessageBox.Show("Неправильный пароль");
-                    }
-                    else
-                    {
-                        new Menu().Show();
-                        Close();
-                    }
-                }
+                _viewModel.ErrorMessage = "Ошибка при авторизации: " + ex.Message;
             }
         }
 

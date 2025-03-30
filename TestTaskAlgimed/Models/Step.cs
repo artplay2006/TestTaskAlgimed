@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 
 namespace TestTaskAlgimed.Models;
 
@@ -15,6 +16,7 @@ public partial class Step
 
     public int Speed { get; set; }
 
+    [Required(AllowEmptyStrings = false)]
     public string Type { get; set; } = null!;
 
     public int Volume { get; set; }

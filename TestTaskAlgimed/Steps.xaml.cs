@@ -20,6 +20,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using System.Xml;
 using TestTaskAlgimed.Models;
+using Microsoft.Data.SqlClient;
 
 namespace TestTaskAlgimed
 {
@@ -28,13 +29,16 @@ namespace TestTaskAlgimed
     /// </summary>
     public partial class Steps : Window
     {
+        private ValidateStepViewModel _viewModel = new ValidateStepViewModel();
+        private Step? selectedStep;
+
         public Steps()
         {
             InitializeComponent();
+            DataContext = _viewModel;
             ExcelPackage.License.SetNonCommercialPersonal("Artem");
             LoadTable();
         }
-        Step? selectedStep;
         private async Task LoadTable()
         {
             await using (var db = new DatabaseContext())
@@ -44,16 +48,14 @@ namespace TestTaskAlgimed
                 {
                     if (e.PropertyName == "Model")
                     {
-                        e.Cancel = true; // Отменяем создание столбца
+                        e.Cancel = true;
                     }
-                    // 2. Делаем столбец "ID" нередактируемым
+
                     if (e.PropertyName == "Id" && e.Column is DataGridBoundColumn column)
                     {
-                        column.IsReadOnly = true; // Запрещаем редактирование
-                                                  //column.Header = "ID";     // Можно задать кастомный заголовок
+                        column.IsReadOnly = true;
                     }
                 };
-                // сделай поле ID не редактируемым
             }
         }
         private async void FromExcelButton_Click(object sender, RoutedEventArgs e)
@@ -101,7 +103,7 @@ namespace TestTaskAlgimed
                             string SpeedStr = worksheet.Cells[rowNum, 5].Text;
                             string TypeStr = worksheet.Cells[rowNum, 6].Text;
                             string VolumeStr = worksheet.Cells[rowNum, 7].Text;
-                            
+
                             if (int.TryParse(idStr, out int id) &&
                                 int.TryParse(ModeIdStr, out int ModeId) &&
                                 int.TryParse(TimerStr, out int Timer) &&
@@ -175,9 +177,9 @@ namespace TestTaskAlgimed
                     }
                 }
                 catch (Microsoft.EntityFrameworkCore.DbUpdateException ex)
+                when (ex.InnerException is SqlException { Number: 547 })
                 {
-                    MessageBox.Show("Ошибка при чтении файла: " + ex.Message + 
-                        "\nЗаписей с такими ModeId в таблице Modes нету!!!");
+                    MessageBox.Show("Ошибка: связанный элемент не существует!", "Ошибка FK");
                 }
                 catch (Exception ex)
                 {
@@ -188,17 +190,10 @@ namespace TestTaskAlgimed
 
         private void DataGridTable_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
-            DataGridRow row = ItemsControl.ContainerFromElement((DataGrid)sender, e.OriginalSource as DependencyObject) as DataGridRow;
-
-            if (row != null)
+            if (DataGridTable.SelectedItem is Step step)
             {
-                selectedStep = row.DataContext as Step;
-                ModeIdLabel.Text = selectedStep.ModeId.ToString();
-                TimerLabel.Text = selectedStep.Timer.ToString();
-                DestioantionLabel.Text = selectedStep.Destionation.ToString();
-                SpeedLabel.Text = selectedStep.Speed.ToString();
-                TypeLabel.Text = selectedStep.Type.ToString();
-                VolumeLabel.Text = selectedStep.Volume.ToString();
+                selectedStep = step;
+                _viewModel.LoadFromStep(step);
             }
         }
 
@@ -206,45 +201,25 @@ namespace TestTaskAlgimed
         {
             try
             {
-                if (string.IsNullOrEmpty(ModeIdLabel.Text)) { MessageBox.Show("ModeId не написано"); return; }
-                if (!int.TryParse(ModeIdLabel.Text, out int ModeId)) { MessageBox.Show("ModeId не число"); return; }
-
-                if (string.IsNullOrEmpty(TimerLabel.Text)) { MessageBox.Show("Timer не написано"); return; }
-                if (!int.TryParse(TimerLabel.Text, out int Timer)) { MessageBox.Show("Timer не число"); return; }
-
-                if (string.IsNullOrEmpty(SpeedLabel.Text)) { MessageBox.Show("Speed не написано"); return; }
-                if (!int.TryParse(SpeedLabel.Text, out int Speed)) { MessageBox.Show("Speed не число"); return; }
-
-                if (string.IsNullOrEmpty(TypeLabel.Text)) { MessageBox.Show("Type не написано"); return; }
-
-                if (string.IsNullOrEmpty(VolumeLabel.Text)) { MessageBox.Show("Volume не написано"); return; }
-                if (!int.TryParse(VolumeLabel.Text, out int Volume)) { MessageBox.Show("Volume не число"); return; }
+                _viewModel.ValidateForAdd();
 
                 await using (var db = new DatabaseContext())
                 {
-                    await db.Steps.AddAsync(new Step
-                    {
-                        ModeId = ModeId,
-                        Timer = Timer,
-                        Destionation = DestioantionLabel.Text,
-                        Speed = Speed,
-                        Type = TypeLabel.Text,
-                        Volume = Volume
-                    });
+                    await db.Steps.AddAsync(_viewModel.ToStep());
                     await db.SaveChangesAsync();
                 }
+
                 MessageBox.Show("Запись добавлена");
                 await LoadTable();
-                ClearTextBoxs();
+                _viewModel.Clear();
             }
             catch (Microsoft.EntityFrameworkCore.DbUpdateException ex)
             {
-                MessageBox.Show("Ошибка при чтении файла: " + ex.Message +
-                    "\nЗаписей с такими ModeId в таблице Modes нету!!!");
+                _viewModel.ErrorMessage = "Ошибка: связанный элемент не существует!";
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Ошибка при чтении файла: " + ex.Message);
+                _viewModel.ErrorMessage = ex.Message;
             }
         }
 
@@ -252,45 +227,32 @@ namespace TestTaskAlgimed
         {
             try
             {
-                if (selectedStep == null) { MessageBox.Show("Step не выбран"); return; }
-
-                if (string.IsNullOrEmpty(ModeIdLabel.Text)) { MessageBox.Show("ModeId не написано"); return; }
-                if (!int.TryParse(ModeIdLabel.Text, out int ModeId)) { MessageBox.Show("ModeId не число"); return; }
-
-                if (string.IsNullOrEmpty(TimerLabel.Text)) { MessageBox.Show("Timer не написано"); return; }
-                if (!int.TryParse(TimerLabel.Text, out int Timer)) { MessageBox.Show("Timer не число"); return; }
-
-                if (string.IsNullOrEmpty(SpeedLabel.Text)) { MessageBox.Show("Speed не написано"); return; }
-                if (!int.TryParse(SpeedLabel.Text, out int Speed)) { MessageBox.Show("Speed не число"); return; }
-
-                if (string.IsNullOrEmpty(TypeLabel.Text)) { MessageBox.Show("Type не написано"); return; }
-
-                if (string.IsNullOrEmpty(VolumeLabel.Text)) { MessageBox.Show("Volume не написано"); return; }
-                if (!int.TryParse(VolumeLabel.Text, out int Volume)) { MessageBox.Show("Volume не число"); return; }
+                _viewModel.ValidateForSave();
 
                 await using (var db = new DatabaseContext())
                 {
-                    selectedStep.ModeId = ModeId;
-                    selectedStep.Timer = Timer;
-                    selectedStep.Destionation = DestioantionLabel.Text;
-                    selectedStep.Speed = Speed;
-                    selectedStep.Type = TypeLabel.Text;
-                    selectedStep.Volume = Volume;
+                    selectedStep.ModeId = int.Parse(_viewModel.ModeId);
+                    selectedStep.Timer = int.Parse(_viewModel.Timer);
+                    selectedStep.Destionation = _viewModel.Destination;
+                    selectedStep.Speed = int.Parse(_viewModel.Speed);
+                    selectedStep.Type = _viewModel.Type;
+                    selectedStep.Volume = int.Parse(_viewModel.Volume);
+
                     db.Update(selectedStep);
                     await db.SaveChangesAsync();
                 }
+
                 MessageBox.Show("Запись изменена");
                 await LoadTable();
-                ClearTextBoxs();
+                _viewModel.Clear();
             }
             catch (Microsoft.EntityFrameworkCore.DbUpdateException ex)
             {
-                MessageBox.Show("Ошибка при чтении файла: " + ex.Message +
-                    "\nЗаписей с такими ModeId в таблице Modes нету!!!");
+                _viewModel.ErrorMessage = "Ошибка: связанный элемент не существует!";
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Ошибка при чтении файла: " + ex.Message);
+                _viewModel.ErrorMessage = ex.Message;
             }
         }
 
@@ -298,9 +260,14 @@ namespace TestTaskAlgimed
         {
             try
             {
-                if (selectedStep == null) { MessageBox.Show("Step не выбран"); return; }
+                _viewModel.ValidateForDelete();
 
-                MessageBoxResult result = MessageBox.Show($"Вы действительно хотите удалить Step с ID {selectedStep.ID}?", "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                MessageBoxResult result = MessageBox.Show(
+                    $"Вы действительно хотите удалить Step с ID {selectedStep.ID}?",
+                    "Подтверждение",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
+
                 if (result == MessageBoxResult.Yes)
                 {
                     await using (var db = new DatabaseContext())
@@ -309,28 +276,25 @@ namespace TestTaskAlgimed
                         await db.SaveChangesAsync();
                     }
                     await LoadTable();
-                    ClearTextBoxs();
+                    _viewModel.Clear();
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Ошибка при чтении файла: " + ex.Message);
+                _viewModel.ErrorMessage = ex.Message;
             }
-        }
-        private void ClearTextBoxs()
-        {
-            ModeIdLabel.Text = "";
-            TimerLabel.Text = "";
-            DestioantionLabel.Text = "";
-            SpeedLabel.Text = "";
-            TypeLabel.Text = "";
-            VolumeLabel.Text = "";
         }
 
         private void ClearButton_Click(object sender, RoutedEventArgs e)
         {
             selectedStep = null;
-            ClearTextBoxs();
+            _viewModel.Clear();
+        }
+
+        private void Button_Click(object sender, RoutedEventArgs e)
+        {
+            new Menu().Show();
+            Close();
         }
     }
 }

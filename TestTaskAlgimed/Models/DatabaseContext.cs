@@ -8,7 +8,6 @@ public partial class DatabaseContext : DbContext
 {
     public DatabaseContext()
     {
-        //Database.EnsureDeleted();
         Database.EnsureCreated();
     }
 
@@ -24,7 +23,7 @@ public partial class DatabaseContext : DbContext
     public virtual DbSet<User> Users { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-        => optionsBuilder.UseSqlite("Data Source=C:\\C#\\TestTaskAlgimed\\TestTaskAlgimed\\bin\\Debug\\net8.0-windows\\database.db");
+        => optionsBuilder.UseSqlite($"Data Source={System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "database.db")}");
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

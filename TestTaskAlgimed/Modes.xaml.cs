@@ -21,6 +21,7 @@ using System.Windows.Media.Media3D;
 using System.Windows.Shapes;
 using System.Xml.Linq;
 using TestTaskAlgimed.Models;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
 namespace TestTaskAlgimed
 {
@@ -29,10 +30,12 @@ namespace TestTaskAlgimed
     /// </summary>
     public partial class Modes : Window
     {
+        private ValidateModeViewModel _viewModel = new ValidateModeViewModel();
         public Modes()
         {
             InitializeComponent();
             ExcelPackage.License.SetNonCommercialPersonal("Artem");
+            DataContext = _viewModel;
             LoadTable();
         }
         Mode? selectedMode;
@@ -45,13 +48,12 @@ namespace TestTaskAlgimed
                 {
                     if (e.PropertyName == "Steps")
                     {
-                        e.Cancel = true; // Отменяем создание столбца
+                        e.Cancel = true;
                     }
-                    // 2. Делаем столбец "ID" нередактируемым
+
                     if (e.PropertyName == "ID" && e.Column is DataGridBoundColumn column)
                     {
-                        column.IsReadOnly = true; // Запрещаем редактирование
-                        //column.Header = "ID";     // Можно задать кастомный заголовок
+                        column.IsReadOnly = true;
                     }
                 };
             }
@@ -75,8 +77,7 @@ namespace TestTaskAlgimed
 
                         if (worksheet.Dimension == null || worksheet.Dimension.End.Row <= 1)
                         {
-                            MessageBox.Show("Лист 'Modes' пуст или не содержит данных.");
-                            return;
+                            throw new Exception("Лист 'Modes' пуст или не содержит данных");
                         }
 
                         List<Mode> modes = new List<Mode>();
@@ -173,13 +174,17 @@ namespace TestTaskAlgimed
         private void DataGridTable_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
             DataGridRow row = ItemsControl.ContainerFromElement((DataGrid)sender, e.OriginalSource as DependencyObject) as DataGridRow;
-
+            _viewModel.ErrorMessage = "";
             if (row != null)
             {
                 selectedMode = row.DataContext as Mode;
                 NameLabel.Text = selectedMode.Name;
                 MaxBottleNumberLabel.Text = selectedMode.MaxBottleNumber.ToString();
                 MaxUsedTipsLabel.Text = selectedMode.MaxUsedTips.ToString();
+                _viewModel.IsModeSelected = true;
+                _viewModel.Name = selectedMode.Name;
+                _viewModel.MaxBottleNumber = selectedMode.MaxBottleNumber.ToString();
+                _viewModel.MaxUsedTips = selectedMode.MaxUsedTips.ToString();
             }
         }
 
@@ -187,19 +192,15 @@ namespace TestTaskAlgimed
         {
             try
             {
-                if (string.IsNullOrEmpty(NameLabel.Text)) { MessageBox.Show("Name не написано"); return; }
-                if (string.IsNullOrEmpty(MaxBottleNumberLabel.Text)) { MessageBox.Show("MaxBottleNumber не написано"); return; }
-                if (!int.TryParse(MaxBottleNumberLabel.Text, out int MaxBottleNumber)) { MessageBox.Show("MaxBottleNumber не число"); return; }
-                if (string.IsNullOrEmpty(MaxUsedTipsLabel.Text)) { MessageBox.Show("MaxUsedTips не написано"); return; }
-                if (!int.TryParse(MaxUsedTipsLabel.Text, out int MaxUsedTips)) { MessageBox.Show("MaxUsedTips не число"); return; }
+                _viewModel.ValidateForAdd();
 
                 await using (var db = new DatabaseContext())
                 {
                     await db.Modes.AddAsync(new Mode
                     {
                         Name = NameLabel.Text,
-                        MaxBottleNumber = MaxBottleNumber,
-                        MaxUsedTips = MaxUsedTips
+                        MaxBottleNumber = int.Parse(_viewModel.MaxBottleNumber),
+                        MaxUsedTips = int.Parse(_viewModel.MaxUsedTips)
                     });
                     await db.SaveChangesAsync();
                 }
@@ -209,7 +210,7 @@ namespace TestTaskAlgimed
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Ошибка при чтении файла: " + ex.Message);
+                _viewModel.ErrorMessage = ex.Message;
             }
         }
 
@@ -217,28 +218,25 @@ namespace TestTaskAlgimed
         {
             try
             {
-                if (selectedMode == null) { MessageBox.Show("Mode не выбран"); return; }
-                if (string.IsNullOrEmpty(NameLabel.Text)) { MessageBox.Show("Name не написано"); return; }
-                if (string.IsNullOrEmpty(MaxBottleNumberLabel.Text)) { MessageBox.Show("MaxBottleNumber не написано"); return; }
-                if (!int.TryParse(MaxBottleNumberLabel.Text, out int MaxBottleNumber)) { MessageBox.Show("MaxBottleNumber не число"); return; }
-                if (string.IsNullOrEmpty(MaxUsedTipsLabel.Text)) { MessageBox.Show("MaxUsedTips не написано"); return; }
-                if (!int.TryParse(MaxUsedTipsLabel.Text, out int MaxUsedTips)) { MessageBox.Show("MaxUsedTips не число"); return; }
+                _viewModel.ValidateForSave();
 
                 await using (var db = new DatabaseContext())
                 {
-                    selectedMode.Name = NameLabel.Text;
-                    selectedMode.MaxBottleNumber = MaxBottleNumber;
-                    selectedMode.MaxUsedTips = MaxUsedTips;
+                    selectedMode.Name = _viewModel.Name;
+                    selectedMode.MaxBottleNumber = int.Parse(_viewModel.MaxBottleNumber);
+                    selectedMode.MaxUsedTips = int.Parse(_viewModel.MaxUsedTips);
+
                     db.Update(selectedMode);
                     await db.SaveChangesAsync();
                 }
+
                 MessageBox.Show("Запись изменена");
                 await LoadTable();
                 ClearTextBoxs();
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Ошибка при чтении файла: " + ex.Message);
+                _viewModel.ErrorMessage = ex.Message;
             }
         }
 
@@ -246,7 +244,7 @@ namespace TestTaskAlgimed
         {
             try
             {
-                if (selectedMode == null) { MessageBox.Show("Mode не выбран"); return; }
+                _viewModel.ValidateForDelete();
 
                 MessageBoxResult result = MessageBox.Show($"Вы действительно хотите удалить Mode с именем {selectedMode.Name}?\n" +
                     $"Все связанные записи из таблицы Steps удалятся", "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Question);
@@ -263,7 +261,7 @@ namespace TestTaskAlgimed
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Ошибка при чтении файла: " + ex.Message);
+                _viewModel.ErrorMessage = ex.Message;
             }
         }
         private void ClearTextBoxs()
@@ -271,11 +269,22 @@ namespace TestTaskAlgimed
             NameLabel.Text = "";
             MaxBottleNumberLabel.Text = "";
             MaxUsedTipsLabel.Text = "";
+            _viewModel.IsModeSelected = false;
+            _viewModel.Name = "";
+            _viewModel.MaxBottleNumber = "";
+            _viewModel.MaxUsedTips = "";
+            _viewModel.ErrorMessage = "";
         }
         private void ClearButton_Click(object sender, RoutedEventArgs e)
         {
             selectedMode = null;
             ClearTextBoxs();
+        }
+
+        private void Button_Click(object sender, RoutedEventArgs e)
+        {
+            new Menu().Show();
+            Close();
         }
     }
 }
