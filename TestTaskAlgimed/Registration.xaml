@@ -1,0 +1,20 @@
+﻿<Window x:Class="TestTaskAlgimed.Registration"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:TestTaskAlgimed"
+        mc:Ignorable="d"
+        Title="Registration" Height="450" Width="800">
+    <Grid>
+        <Button x:Name="AuthPageButton" Content="Уже есть аккаунт" HorizontalAlignment="Left" Margin="638,10,0,0" VerticalAlignment="Top" Width="108" FontSize="9" Click="Button_Click"/>
+        <Label Content="Регистрация" HorizontalAlignment="Center" Margin="0,50,0,0" VerticalAlignment="Top"/>
+        <Label Content="Логин" HorizontalAlignment="Left" Margin="318,120,0,0" VerticalAlignment="Top"/>
+        <TextBox x:Name="LoginLabel" HorizontalAlignment="Left" Margin="321,159,0,0" TextWrapping="Wrap" Text="" VerticalAlignment="Top" Width="120"/>
+        <Label Content="Пароль" HorizontalAlignment="Left" Margin="318,182,0,0" VerticalAlignment="Top"/>
+        <TextBox x:Name="PasswordLabel" HorizontalAlignment="Left" Margin="321,217,0,0" TextWrapping="Wrap" Text="" VerticalAlignment="Top" Width="120"/>
+        <Label Content="Повторить пароль" HorizontalAlignment="Left" Margin="318,251,0,0" VerticalAlignment="Top"/>
+        <TextBox x:Name="RepeatPasswordLabel" HorizontalAlignment="Left" Margin="321,286,0,0" TextWrapping="Wrap" Text="" VerticalAlignment="Top" Width="120"/>
+        <Button x:Name="RegButton" Content="Продолжить" HorizontalAlignment="Left" Margin="381,327,0,0" VerticalAlignment="Top" RenderTransformOrigin="0.55,-0.499" Width="60" FontSize="9" Click="RegButton_Click"/>
+    </Grid>
+</Window>
